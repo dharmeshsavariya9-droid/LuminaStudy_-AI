@@ -8,4 +8,4 @@ const firebaseConfig = {
   measurementId: "G-NHKGM6K47G"
 };
 
-window.firebaseConfig = firebaseConfig;
+window.LUMINA_FIREBASE_CONFIG = firebaseConfig;
