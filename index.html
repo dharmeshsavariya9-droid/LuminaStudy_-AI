@@ -1,148 +1,170 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0F1117">
-  <title>LuminaStudy AI</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; min-height: 100vh; padding: 24px;
-      display: grid; place-items: center;
-      background: #0F1117; color: #F8FAFC;
-      font-family: Arial, Helvetica, sans-serif;
-    }
-    .panel { width: 100%; max-width: 380px; text-align: center; }
-    .logo {
-      width: 82px; height: 82px; margin: 0 auto 20px; border-radius: 26px;
-      display: grid; place-items: center; font-size: 42px;
-      background: linear-gradient(135deg, #4285F4, #8B5CF6, #06B6D4);
-      box-shadow: 0 0 42px rgba(99, 102, 241, .25);
-    }
-    h1 { margin: 0; font-size: 30px; letter-spacing: -.8px; }
-    p { color: #94A3B8; line-height: 1.5; }
-    .tagline { margin: 12px 0 28px; }
-    button {
-      width: 100%; min-height: 54px; border: 0; border-radius: 28px;
-      background: #fff; color: #202124; font-size: 16px; font-weight: 600;
-      cursor: pointer; padding: 12px 18px;
-    }
-    button:disabled { opacity: .65; cursor: wait; }
-    .secondary { margin-top: 12px; background: #242938; color: #F8FAFC; }
-    #status { min-height: 44px; margin-top: 16px; font-size: 13px; color: #94A3B8; overflow-wrap: anywhere; }
-    #workspace { display: none; }
-    .welcome { margin: 24px 0; padding: 18px; border: 1px solid #303747; border-radius: 16px; background: #171C27; }
-    .small { font-size: 13px; color: #94A3B8; }
-  </style>
+  <title>LuminaStudy AI — Complete Learning Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main class="panel">
-    <section id="login">
-      <div class="logo" aria-hidden="true">✦</div>
-      <h1>LuminaStudy AI</h1>
-      <p class="tagline">Your focused space to learn, plan, and grow.</p>
-      <button id="googleButton" type="button">Continue with Google</button>
-      <div id="status" role="status">Sign in to continue.</div>
-    </section>
 
-    <section id="workspace">
-      <div class="logo" aria-hidden="true">✦</div>
-      <h1>LuminaStudy AI</h1>
-      <div class="welcome">
-        <h2 id="welcomeName">Welcome!</h2>
-        <p>You are signed in successfully.</p>
-        <p class="small">This is the first workspace placeholder. Study tools and features have not been added yet.</p>
+  <!-- AUTHENTICATION GATE (Visible until Firebase Auth succeeds) -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="brand-logo" aria-hidden="true">✦</div>
+        <div>
+          <h1 class="auth-title">LuminaStudy AI</h1>
+          <p class="auth-subtitle">Your structured AI &amp; multi-subject learning workspace</p>
+        </div>
       </div>
-      <button class="secondary" id="logoutButton" type="button">Sign out</button>
-      <div id="workspaceStatus" class="small"></div>
-    </section>
-  </main>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js";
-    import {
-      getAuth, GoogleAuthProvider, signInWithPopup,
-      signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut
-    } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js";
+      <div id="firebase-config-banner" class="alert alert-warning hidden">
+        <strong>Firebase Setup Required:</strong> Open <code>firebase-config.js</code> and paste your existing Firebase project's <code>firebaseConfig</code> values so Google &amp; Email authentication can connect.
+      </div>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyARZhbi2if1AuSlvMl9lQTXhL_1CrCEh0Q",
-      authDomain: "luminastudy-ai.firebaseapp.com",
-      projectId: "luminastudy-ai",
-      storageBucket: "luminastudy-ai.firebasestorage.app",
-      messagingSenderId: "387308758666",
-      appId: "1:387308758666:web:680a7c6c8910ca14b2ef73",
-      measurementId: "G-NHKGM6K47G"
-    };
+      <div id="auth-alert" class="alert hidden" role="alert"></div>
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: "select_account" });
+      <div class="auth-tabs" role="tablist">
+        <button id="tab-login" class="auth-tab active" type="button">Sign In</button>
+        <button id="tab-register" class="auth-tab" type="button">Create Account</button>
+      </div>
 
-    const loginSection = document.getElementById("login");
-    const workspaceSection = document.getElementById("workspace");
-    const googleButton = document.getElementById("googleButton");
-    const status = document.getElementById("status");
+      <form id="auth-form">
+        <div id="register-name-group" class="form-group hidden">
+          <label class="form-label" for="auth-name">Display Name</label>
+          <input id="auth-name" class="form-input" type="text" placeholder="e.g. Aarav Patel" autocomplete="name">
+        </div>
 
-    function showError(error) {
-      console.error(error);
-      const messages = {
-        "auth/unauthorized-domain": "This website domain is not authorised in Firebase. Check Authentication → Settings → Authorized domains.",
-        "auth/popup-closed-by-user": "The Google sign-in window was closed before finishing. Please try again.",
-        "auth/popup-blocked": "Your browser blocked the sign-in window. Allow pop-ups for this site and try again."
-      };
-      status.textContent = messages[error.code] || `Sign-in failed: ${error.message || error.code || "Please try again."}`;
-    }
+        <div class="form-group">
+          <label class="form-label" for="auth-email">Email Address</label>
+          <input id="auth-email" class="form-input" type="email" placeholder="you@example.com" autocomplete="email" required>
+        </div>
 
-    googleButton.addEventListener("click", async () => {
-      googleButton.disabled = true;
-      status.textContent = "Opening Google sign-in...";
-      try {
-        await signInWithPopup(auth, provider);
-      } catch (error) {
-        if (error.code === "auth/popup-blocked") {
-          try {
-            await signInWithRedirect(auth, provider);
-            return;
-          } catch (redirectError) {
-            showError(redirectError);
-          }
-        } else {
-          showError(error);
-        }
-      } finally {
-        googleButton.disabled = false;
-      }
-    });
+        <div class="form-group">
+          <label class="form-label" for="auth-password">Password</label>
+          <input id="auth-password" class="form-input" type="password" placeholder="At least 6 characters" autocomplete="current-password" required>
+        </div>
 
-    document.getElementById("logoutButton").addEventListener("click", async () => {
-      try {
-        await signOut(auth);
-        document.getElementById("workspaceStatus").textContent = "";
-      } catch (error) {
-        document.getElementById("workspaceStatus").textContent = "Sign-out failed. Please try again.";
-        console.error(error);
-      }
-    });
+        <button id="auth-submit-btn" class="btn btn-primary btn-full" type="submit">Sign In</button>
+      </form>
 
-    try {
-      await getRedirectResult(auth);
-    } catch (error) {
-      showError(error);
-    }
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:0.84rem;">
+        <button id="forgot-password-btn" type="button" class="btn btn-sm" style="background:transparent; padding:4px 0; color:#818cf8;">Forgot password?</button>
+        <button id="auth-theme-btn" type="button" class="btn btn-sm btn-secondary">Toggle Theme</button>
+      </div>
 
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        loginSection.style.display = "none";
-        workspaceSection.style.display = "block";
-        document.getElementById("welcomeName").textContent = `Welcome, ${user.displayName || "student"}!`;
-      } else {
-        loginSection.style.display = "block";
-        workspaceSection.style.display = "none";
-      }
-    });
-  </script>
+      <div class="divider">or continue with</div>
+
+      <button id="google-signin-btn" class="btn btn-secondary btn-full" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z"/>
+          <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1C3.3 21.4 7.3 24 12 24z"/>
+          <path fill="#FBBC05" d="M5.3 14.3c-.2-.7-.4-1.5-.4-2.3s.1-1.6.4-2.3V6.6H1.3C.5 8.2 0 10.1 0 12s.5 3.8 1.3 5.4l4-3.1z"/>
+          <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4C17.9 1.2 15.2 0 12 0 7.3 0 3.3 2.6 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z"/>
+        </svg>
+        Sign in with Google
+      </button>
+
+      <p style="font-size:0.78rem; color:var(--text-muted); margin:16px 0 0; text-align:center;">
+        Authentication is handled securely by Firebase Authentication. Passwords are never stored in browser storage.
+      </p>
+    </div>
+  </div>
+
+  <!-- SIGNED-IN WORKSPACE (Hidden until Firebase Auth confirms user) -->
+  <div id="app-shell" class="app-shell hidden">
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+    <aside id="sidebar" class="sidebar" aria-label="Main Navigation">
+      <div class="sidebar-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="brand-logo" style="width:34px; height:34px; font-size:15px;">✦</div>
+          <div>
+            <div style="font-weight:800; font-size:0.98rem;">LuminaStudy AI</div>
+            <div style="font-size:0.72rem; color:var(--text-muted);">Learning Platform</div>
+          </div>
+        </div>
+        <button id="close-sidebar-btn" class="mobile-menu-btn" type="button" aria-label="Close menu">✕</button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">Core</div>
+        <button class="nav-item active" data-page="home">🏠 Home</button>
+        <button class="nav-item" data-page="search">🔍 Search</button>
+        <button class="nav-item" data-page="ai-chat">✨ AI Chat Assistant</button>
+
+        <div class="nav-section-label">Learning</div>
+        <button class="nav-item" data-page="courses">📚 Courses</button>
+        <button class="nav-item" data-page="categories">🗂️ Course Categories</button>
+        <button class="nav-item" data-page="my-learning">🎯 My Learning</button>
+        <button class="nav-item" data-page="notes">📝 Notes</button>
+        <button class="nav-item" data-page="saved">🔖 Saved</button>
+
+        <div class="nav-section-label">News &amp; Markets</div>
+        <button class="nav-item" data-page="daily-news">📰 Daily News</button>
+        <button class="nav-item" data-page="tech-news">💻 Technology News</button>
+        <button class="nav-item" data-page="ai-news">🤖 AI News</button>
+        <button class="nav-item" data-page="market">📈 Market Education</button>
+
+        <div class="nav-section-label">Workspace</div>
+        <button class="nav-item" data-page="tools">🛠️ Tools</button>
+        <button class="nav-item" data-page="settings">⚙️ Settings</button>
+        <button class="nav-item" data-page="help">❓ Help and About</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div id="sidebar-user-email" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:8px;">Signed in</div>
+        <button id="sidebar-logout-btn" class="btn btn-outline btn-sm btn-full" type="button">Sign Out</button>
+      </div>
+    </aside>
+
+    <div class="main-area">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="open-sidebar-btn" class="mobile-menu-btn" type="button" aria-label="Open menu">☰</button>
+          <div id="topbar-page-title" style="font-weight:700; font-size:1rem; white-space:nowrap;">Home</div>
+          <div class="topbar-search">
+            <span>🔍</span>
+            <input id="topbar-search-input" type="search" placeholder="Search courses, lessons, notes..." aria-label="Quick search">
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button id="theme-toggle-btn" class="btn btn-secondary btn-sm" type="button" title="Toggle Dark/Light Theme">🌗 Theme</button>
+          <div class="user-pill">
+            <div id="topbar-avatar" class="user-avatar">U</div>
+            <span id="topbar-username" style="max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Learner</span>
+          </div>
+        </div>
+      </header>
+
+      <main id="page-content" class="page-content" tabindex="-1"></main>
+    </div>
+
+    <nav class="mobile-bottom-nav" aria-label="Quick mobile navigation">
+      <button class="mobile-bottom-btn active" data-page="home"><span>🏠</span><span>Home</span></button>
+      <button class="mobile-bottom-btn" data-page="search"><span>🔍</span><span>Search</span></button>
+      <button class="mobile-bottom-btn" data-page="courses"><span>📚</span><span>Courses</span></button>
+      <button class="mobile-bottom-btn" data-page="ai-chat"><span>✨</span><span>AI</span></button>
+      <button class="mobile-bottom-btn" data-page="tools"><span>🛠️</span><span>Tools</span></button>
+    </nav>
+  </div>
+
+  <!-- MODAL & TOASTS -->
+  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div id="modal-card" class="modal-card"></div>
+  </div>
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Firebase Compat SDKs (compatible with GitHub Pages & static hosting) -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="courses-data.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
