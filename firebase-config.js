@@ -1,5 +1,5 @@
 const firebaseConfig = {
-  apiKey: "AIzaSyARZhbi2if1AuSlvMl9lQTXhL_1CrCEh0Q",
+  apiKey: "YOUR_ACTUAL_API_KEY",
   authDomain: "luminastudy-ai.firebaseapp.com",
   projectId: "luminastudy-ai",
   storageBucket: "luminastudy-ai.firebasestorage.app",
@@ -8,4 +8,4 @@ const firebaseConfig = {
   measurementId: "G-NHKGM6K47G"
 };
 
-export default firebaseConfig;
+window.firebaseConfig = firebaseConfig;
