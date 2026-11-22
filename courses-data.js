@@ -1,4 +1,4 @@
-```javascript
+javascript
 // LuminaStudy AI - Expandable Course Library (Beginner -> Intermediate -> Advanced), Guided Paths, Google News Feeds & Glossary
 
 window.LUMINA_CATEGORIES = [
@@ -1385,4 +1385,4 @@ window.LUMINA_INTERVIEW_QUESTIONS = [
     guide: "Connect your curiosity, past projects, and long-term goals to the industry."
   }
 ];
-```
+
