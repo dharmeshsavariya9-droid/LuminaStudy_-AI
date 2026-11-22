@@ -632,16 +632,6 @@ button {
   color: #b45309;
 }
 
-.badge-rose {
-  background: rgba(244, 63, 94, 0.14);
-  color: #fda4af;
-  border-color: rgba(244, 63, 94, 0.35);
-}
-
-[data-theme="light"] .badge-rose {
-  color: #be123c;
-}
-
 .progress-track {
   width: 100%;
   height: 8px;
@@ -743,37 +733,11 @@ button {
   background: rgba(244, 63, 94, 0.16);
 }
 
-/* Roadmap Step Chips */
-.roadmap-steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.roadmap-step-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-input);
-  font-size: 0.82rem;
-  font-weight: 600;
-  transition: var(--transition);
-}
-
-.roadmap-step-btn:hover {
-  border-color: var(--accent-primary);
-  background: rgba(124, 58, 237, 0.14);
-}
-
-/* Gemini-style Chat UI */
+/* Chat UI */
 .chat-box {
   display: flex;
   flex-direction: column;
-  height: 560px;
+  height: 520px;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -789,59 +753,18 @@ button {
   gap: 14px;
 }
 
-.chat-welcome {
-  margin: auto;
-  max-width: 680px;
-  text-align: center;
-  padding: 16px 8px;
-}
-
-.chat-welcome-title {
-  font-size: 1.5rem;
-  font-weight: 800;
-  background: var(--gradient-brand);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin: 0 0 8px;
-}
-
-.starter-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
-  text-align: left;
-}
-
-.starter-chip {
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-input);
-  font-size: 0.85rem;
-  font-weight: 500;
-  transition: var(--transition);
-}
-
-.starter-chip:hover {
-  border-color: var(--accent-primary);
-  background: rgba(124, 58, 237, 0.14);
-}
-
 .chat-msg {
-  max-width: 86%;
+  max-width: 85%;
   padding: 12px 16px;
   border-radius: 14px;
   font-size: 0.92rem;
-  line-height: 1.55;
-  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .chat-msg.user {
   align-self: flex-end;
   background: var(--gradient-brand);
   color: #fff;
-  white-space: pre-wrap;
 }
 
 .chat-msg.assistant {
@@ -850,34 +773,12 @@ button {
   border: 1px solid var(--border-subtle);
 }
 
-.chat-msg pre {
-  background: rgba(0, 0, 0, 0.35);
-  padding: 10px 12px;
-  border-radius: 8px;
-  overflow-x: auto;
-  font-size: 0.84rem;
-  margin: 8px 0;
-}
-
-.chat-msg code {
-  background: rgba(124, 58, 237, 0.18);
-  padding: 2px 5px;
-  border-radius: 5px;
-  font-size: 0.86em;
-}
-
-.chat-msg pre code {
-  background: transparent;
-  padding: 0;
-}
-
 .chat-composer {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   padding: 12px;
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-secondary);
-  align-items: center;
 }
 
 .pill-bar {
@@ -1021,7 +922,7 @@ button {
   .page-content {
     padding: 16px;
   }
-  .grid-2, .grid-3, .grid-4, .starter-grid {
+  .grid-2, .grid-3, .grid-4 {
     grid-template-columns: 1fr;
   }
 }

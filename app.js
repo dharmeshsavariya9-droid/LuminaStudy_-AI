@@ -1,5 +1,4 @@
-```javascript
-// LuminaStudy AI - Main Application Logic (v2: Gemini-Style AI, Live Google News, Beginner->Advanced Paths)
+// LuminaStudy AI - Main Application Logic
 (function () {
   "use strict";
 
@@ -7,13 +6,13 @@
     "home": "Home Dashboard",
     "search": "Search Everything",
     "ai-chat": "AI Chat Assistant",
-    "courses": "Courses & Roadmaps",
+    "courses": "Courses",
     "course-detail": "Course Workspace",
     "categories": "Course Categories",
     "my-learning": "My Learning",
     "notes": "Notes",
     "saved": "Saved Content",
-    "daily-news": "Daily Google News",
+    "daily-news": "Daily News",
     "tech-news": "Technology News",
     "ai-news": "AI News",
     "market": "Market Education",
@@ -32,10 +31,7 @@
   let activeLessonId = null;
   let activeToolTab = "prompt-gen";
   let activeNewsTab = "daily";
-  let newsRegion = "IN";
-  let newsCache = {};
   let selectedAiMode = "Explain simply";
-  let selectedCourseLevel = "all";
   let marketChartInstance = null;
   let pomodoroInterval = null;
   let pomodoroSeconds = 25 * 60;
@@ -52,23 +48,6 @@
       .replace(/'/g, "&#39;");
   }
 
-  function formatChatMessage(rawText) {
-    let safe = esc(rawText);
-    safe = safe.replace(/```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```/g, (_, _lang, code) => {
-      return `<pre><code>${code.trim()}</code></pre>`;
-    });
-    safe = safe.replace(/`([^`]+)`/g, "<code>$1</code>");
-    safe = safe.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    safe = safe.replace(/\n/g, "<br>");
-    return safe;
-  }
-
-  function levelBadgeClass(level) {
-    if (level === "Intermediate") return "badge-cyan";
-    if (level === "Advanced") return "badge-rose";
-    return "badge-emerald";
-  }
-
   function showToast(message) {
     const container = document.getElementById("toast-container");
     if (!container) return;
@@ -76,7 +55,9 @@
     el.className = "toast";
     el.textContent = message;
     container.appendChild(el);
-    setTimeout(() => el.remove(), 3200);
+    setTimeout(() => {
+      el.remove();
+    }, 3200);
   }
 
   function copyText(text) {
@@ -118,6 +99,10 @@
     URL.revokeObjectURL(url);
   }
 
+  function isMobileBrowser() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  }
+
   function openModal(html) {
     const overlay = document.getElementById("modal-overlay");
     const card = document.getElementById("modal-card");
@@ -126,28 +111,11 @@
   }
 
   function closeModal() {
-    document.getElementById("modal-overlay").classList.add("hidden");
+    const overlay = document.getElementById("modal-overlay");
+    overlay.classList.add("hidden");
   }
 
-  function getGeminiKey() {
-    try {
-      return (localStorage.getItem("lumina_gemini_api_key") || "").trim();
-    } catch {
-      return "";
-    }
-  }
-
-  function setGeminiKey(key) {
-    try {
-      if (key && key.trim()) {
-        localStorage.setItem("lumina_gemini_api_key", key.trim());
-      } else {
-        localStorage.removeItem("lumina_gemini_api_key");
-      }
-    } catch {}
-  }
-
-  // ---------- StorageService ----------
+  // ---------- StorageService (Structured for future Firestore users/{uid}/...) ----------
   function defaultUserData() {
     return {
       preferences: {
@@ -158,25 +126,25 @@
         studyReminders: true
       },
       progress: {
-        completedLessons: {},
+        completedLessons: {}, // { lessonId: timestamp }
         lastCourseId: "business-fundamentals",
         lastLessonId: "bf-1-1",
         todayMinutes: 0,
         todayDate: new Date().toISOString().slice(0, 10)
       },
-      notes: [],
+      notes: [], // { id, title, content, tag, courseId, updatedAt }
       bookmarks: {
-        lessons: [],
-        prompts: [],
-        content: []
+        lessons: [], // lessonIds
+        prompts: [], // { id, title, prompt, createdAt }
+        content: []  // { id, title, body, createdAt }
       },
-      studyPlans: [],
-      quizResults: {},
-      history: [],
-      chatHistory: [],
+      studyPlans: [], // { id, day, time, subject, notes }
+      quizResults: {}, // { lessonId: { score, total, answeredAt } }
+      history: [], // { type, title, refId, at }
+      chatHistory: [], // { role, text, at }
       flashcards: [
         { id: "fc-1", deck: "Business", front: "What is Gross Profit?", back: "Revenue minus Cost of Goods Sold (COGS)." },
-        { id: "fc-2", deck: "AI", front: "What is RAG in AI?", back: "Retrieval-Augmented Generation: retrieving verified documents and feeding them to an LLM." },
+        { id: "fc-2", deck: "AI", front: "What is a Token in LLMs?", back: "A small chunk of text (word or sub-word) processed by a language model." },
         { id: "fc-3", deck: "Finance", front: "What is Compound Interest?", back: "Interest earned on both the original principal and previously earned interest." }
       ],
       businessWorksheet: {
@@ -250,7 +218,9 @@
   function toggleTheme() {
     const current = document.documentElement.getAttribute("data-theme") || "dark";
     applyTheme(current === "dark" ? "light" : "dark");
-    if (currentPage === "market") renderMarketChart();
+    if (currentPage === "market") {
+      renderMarketChart();
+    }
   }
 
   // ---------- Firebase Auth ----------
@@ -314,7 +284,9 @@
       if (banner) banner.classList.add("hidden");
 
       firebaseAuth.getRedirectResult().catch((err) => {
-        if (err && err.code) showAuthAlert(friendlyAuthError(err), "error");
+        if (err && err.code) {
+          showAuthAlert(friendlyAuthError(err), "error");
+        }
       });
 
       firebaseAuth.onAuthStateChanged((user) => {
@@ -415,7 +387,6 @@
       }
     });
 
-    // Fixed for mobile Chrome: try popup first, fallback to redirect only if blocked
     googleBtn.addEventListener("click", async () => {
       hideAuthAlert();
       if (!firebaseConfigured || !firebaseAuth) {
@@ -425,13 +396,17 @@
       googleBtn.disabled = true;
       const provider = new firebase.auth.GoogleAuthProvider();
       try {
-        try {
-          await firebaseAuth.signInWithPopup(provider);
-        } catch (popupErr) {
-          if (popupErr.code === "auth/popup-blocked") {
-            await firebaseAuth.signInWithRedirect(provider);
-          } else {
-            throw popupErr;
+        if (isMobileBrowser()) {
+          await firebaseAuth.signInWithRedirect(provider);
+        } else {
+          try {
+            await firebaseAuth.signInWithPopup(provider);
+          } catch (popupErr) {
+            if (popupErr.code === "auth/popup-blocked") {
+              await firebaseAuth.signInWithRedirect(provider);
+            } else {
+              throw popupErr;
+            }
           }
         }
       } catch (err) {
@@ -478,7 +453,9 @@
   function getFlatLessons(course) {
     const list = [];
     course.chapters.forEach((ch) => {
-      ch.lessons.forEach((ls) => list.push({ ...ls, chapterTitle: ch.title }));
+      ch.lessons.forEach((ls) => {
+        list.push({ ...ls, chapterTitle: ch.title });
+      });
     });
     return list;
   }
@@ -537,8 +514,8 @@
     switch (page) {
       case "home": renderHome(container); break;
       case "search": renderSearch(container, opts.query || ""); break;
-      case "ai-chat": renderAiChat(container, opts.prefill || "", Boolean(opts.autoSend)); break;
-      case "courses": renderCourses(container, opts.categoryId || "all", opts.level || selectedCourseLevel); break;
+      case "ai-chat": renderAiChat(container, opts.prefill || ""); break;
+      case "courses": renderCourses(container, opts.categoryId || "all"); break;
       case "course-detail": renderCourseDetail(container, opts.courseId || activeCourseId, opts.lessonId || activeLessonId); break;
       case "categories": renderCategories(container); break;
       case "my-learning": renderMyLearning(container); break;
@@ -577,13 +554,12 @@
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <button class="btn btn-primary" id="home-resume-btn">▶ Continue Learning</button>
           <button class="btn btn-secondary" id="home-ai-btn">✨ Open AI Assistant</button>
-          <button class="btn btn-outline" id="home-news-btn">📰 Daily Google News</button>
         </div>
       </div>
 
       <div class="card" style="margin-bottom:20px;">
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <input id="home-search-input" class="form-input" style="flex:1; min-width:200px;" type="search" placeholder="Search Beginner → Advanced courses, lessons, notes, or topics...">
+          <input id="home-search-input" class="form-input" style="flex:1; min-width:200px;" type="search" placeholder="Search courses, lessons, notes, or topics...">
           <button id="home-search-btn" class="btn btn-primary" type="button">Search</button>
         </div>
       </div>
@@ -618,7 +594,7 @@
       <div class="grid grid-2" style="margin-bottom:20px;">
         <div class="card">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span class="badge ${levelBadgeClass(resumeCourse.level)}">${esc(resumeCourse.level)} · Continue</span>
+            <span class="badge badge-cyan">Continue Learning</span>
             <span class="card-muted">${resumeProg.percent}% complete</span>
           </div>
           <h3 style="margin:10px 0 4px;">${esc(resumeCourse.title)}</h3>
@@ -633,33 +609,28 @@
           <p class="card-muted">${esc(dailyTopic.summary)}</p>
           <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-secondary btn-sm" id="daily-topic-course-btn">Explore Related Course</button>
-            <button class="btn btn-outline btn-sm" id="daily-topic-ai-btn">Ask AI Assistant</button>
+            <button class="btn btn-outline btn-sm" id="daily-topic-ai-btn">Ask AI Prompt</button>
           </div>
         </div>
       </div>
 
       <div class="section-header">
-        <h2>Guided Roadmaps (Beginner → Intermediate → Advanced)</h2>
-        <button class="btn btn-sm btn-outline" data-nav="courses">View All ${window.LUMINA_COURSES.length} Courses</button>
+        <h2>Recent Courses</h2>
+        <button class="btn btn-sm btn-outline" data-nav="courses">All Courses</button>
       </div>
-      <div class="grid grid-2" style="margin-bottom:20px;">
-        ${window.LUMINA_LEARNING_PATHS.map((path) => `
-          <div class="card">
-            <h3 class="card-title">${esc(path.title)}</h3>
-            <p class="card-muted">${esc(path.description)}</p>
-            <div class="roadmap-steps">
-              ${path.steps.map((st) => {
-                const c = getCourseById(st.courseId);
-                const p = getCourseProgress(c, data);
-                return `<button class="roadmap-step-btn open-course-btn" data-course="${st.courseId}">
-                  <span>${p.percent === 100 ? "✅" : "📘"}</span>
-                  <span>${esc(st.label)}</span>
-                  <span class="badge ${levelBadgeClass(st.level)}" style="padding:1px 7px; font-size:0.68rem;">${esc(st.level)}</span>
-                </button>`;
-              }).join("")}
+      <div class="grid grid-3" style="margin-bottom:20px;">
+        ${window.LUMINA_COURSES.slice(0, 3).map((c) => {
+          const p = getCourseProgress(c, data);
+          return `
+            <div class="card card-interactive">
+              <span class="badge">${esc(c.level)}</span>
+              <h3 class="card-title" style="margin-top:8px;">${esc(c.title)}</h3>
+              <p class="card-muted">${esc(c.description)}</p>
+              <div class="progress-track"><div class="progress-fill" style="width:${p.percent}%"></div></div>
+              <button class="btn btn-sm btn-primary open-course-btn" data-course="${c.id}">Start / Resume</button>
             </div>
-          </div>
-        `).join("")}
+          `;
+        }).join("")}
       </div>
 
       <div class="grid grid-2">
@@ -675,10 +646,11 @@
           </div>
         </div>
         <div class="card">
-          <h3 class="card-title">Live Google News &amp; Market Education</h3>
-          <p class="card-muted" style="margin-bottom:12px;">Read daily Google News headlines across India/Global, or learn market fundamentals with demo charts.</p>
+          <h3 class="card-title">News &amp; Market Education</h3>
+          <div class="alert alert-info" style="margin:8px 0;">Live news is not connected yet.</div>
+          <p class="card-muted" style="margin-bottom:12px;">Browse curated reputable news sources or learn market fundamentals with clearly labeled demo charts.</p>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="btn btn-sm btn-primary" data-nav="daily-news">📰 Live Google News</button>
+            <button class="btn btn-sm btn-secondary" data-nav="daily-news">📰 News Hub</button>
             <button class="btn btn-sm btn-secondary" data-nav="market">📈 Market Education</button>
             <button class="btn btn-sm btn-outline" data-nav="categories">🗂️ 6 Categories</button>
           </div>
@@ -693,7 +665,6 @@
       navigateTo("course-detail", { courseId: resumeCourse.id, lessonId: data.progress.lastLessonId });
     });
     document.getElementById("home-ai-btn").addEventListener("click", () => navigateTo("ai-chat"));
-    document.getElementById("home-news-btn").addEventListener("click", () => navigateTo("daily-news"));
     document.getElementById("home-log-10m").addEventListener("click", () => {
       const d = loadData();
       d.progress.todayMinutes += 10;
@@ -702,16 +673,19 @@
       renderHome(container);
     });
     document.getElementById("home-search-btn").addEventListener("click", () => {
-      navigateTo("search", { query: document.getElementById("home-search-input").value.trim() });
+      const q = document.getElementById("home-search-input").value.trim();
+      navigateTo("search", { query: q });
     });
     document.getElementById("home-search-input").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") navigateTo("search", { query: e.target.value.trim() });
+      if (e.key === "Enter") {
+        navigateTo("search", { query: e.target.value.trim() });
+      }
     });
     document.getElementById("daily-topic-course-btn").addEventListener("click", () => {
       navigateTo("course-detail", { courseId: dailyTopic.courseId });
     });
     document.getElementById("daily-topic-ai-btn").addEventListener("click", () => {
-      navigateTo("ai-chat", { prefill: "Explain " + dailyTopic.title + " simply with an example", autoSend: true });
+      navigateTo("ai-chat", { prefill: "Explain " + dailyTopic.title + " for a beginner" });
     });
     container.querySelectorAll("[data-nav]").forEach((btn) => {
       btn.addEventListener("click", () => navigateTo(btn.dataset.nav));
@@ -729,9 +703,9 @@
     container.innerHTML = `
       <div class="card" style="margin-bottom:20px;">
         <h2 style="margin:0 0 10px;">Unified Search</h2>
-        <p class="card-muted" style="margin-bottom:12px;">Search across all Beginner, Intermediate &amp; Advanced courses, lessons, subjects, your notes, and glossary.</p>
+        <p class="card-muted" style="margin-bottom:12px;">Search across courses, lessons, subjects, your notes, saved content, and learning topics.</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <input id="global-search-input" class="form-input" style="flex:1; min-width:200px;" type="search" value="${esc(initialQuery)}" placeholder="Type a keyword (e.g. Python, OOP, RAG, DCF, P/E, Compound)...">
+          <input id="global-search-input" class="form-input" style="flex:1; min-width:200px;" type="search" value="${esc(initialQuery)}" placeholder="Type a keyword (e.g. Python, BBA, Marketing, Compound, AI)...">
           <button id="global-search-clear" class="btn btn-secondary" type="button">Clear</button>
         </div>
       </div>
@@ -748,7 +722,7 @@
           <div class="card" style="text-align:center; padding:36px;">
             <div style="font-size:2rem; margin-bottom:8px;">🔍</div>
             <h3>Start typing to search</h3>
-            <p class="card-muted">Try searching for <strong>RAG</strong>, <strong>OOP</strong>, <strong>DCF</strong>, <strong>Index Fund</strong>, or your own notes.</p>
+            <p class="card-muted">Try searching for <strong>Python</strong>, <strong>BBA</strong>, <strong>Marketing</strong>, <strong>Bitcoin</strong>, or your own notes.</p>
           </div>
         `;
         return;
@@ -756,7 +730,7 @@
 
       const data = loadData();
       const matchedCourses = window.LUMINA_COURSES.filter((c) =>
-        c.title.toLowerCase().includes(term) || c.description.toLowerCase().includes(term) || c.level.toLowerCase().includes(term)
+        c.title.toLowerCase().includes(term) || c.description.toLowerCase().includes(term)
       );
 
       const matchedLessons = [];
@@ -773,7 +747,9 @@
       const matchedSubjects = [];
       window.LUMINA_CATEGORIES.forEach((cat) => {
         cat.subjects.forEach((sub) => {
-          if (sub.toLowerCase().includes(term)) matchedSubjects.push({ cat, sub });
+          if (sub.toLowerCase().includes(term)) {
+            matchedSubjects.push({ cat, sub });
+          }
         });
       });
 
@@ -781,22 +757,23 @@
         n.title.toLowerCase().includes(term) || n.content.toLowerCase().includes(term)
       );
 
+      const matchedSaved = [
+        ...data.bookmarks.prompts.filter((p) => p.title.toLowerCase().includes(term) || p.prompt.toLowerCase().includes(term)),
+        ...data.bookmarks.content.filter((c) => c.title.toLowerCase().includes(term) || c.body.toLowerCase().includes(term))
+      ];
+
       const matchedTopics = window.LUMINA_MARKET_TOPICS.filter((t) =>
         t.title.toLowerCase().includes(term) || t.summary.toLowerCase().includes(term)
       );
 
-      const total = matchedCourses.length + matchedLessons.length + matchedSubjects.length + matchedNotes.length + matchedTopics.length;
+      const total = matchedCourses.length + matchedLessons.length + matchedSubjects.length + matchedNotes.length + matchedSaved.length + matchedTopics.length;
       if (total === 0) {
         resultsArea.innerHTML = `
           <div class="card" style="text-align:center; padding:36px;">
             <h3>No matches found for "${esc(q)}"</h3>
-            <p class="card-muted">Try asking the AI Assistant about "${esc(q)}" instead.</p>
-            <button class="btn btn-primary btn-sm" id="search-ask-ai-btn">✨ Ask AI Assistant</button>
+            <p class="card-muted">Try a broader keyword or clear your search.</p>
           </div>
         `;
-        document.getElementById("search-ask-ai-btn").addEventListener("click", () => {
-          navigateTo("ai-chat", { prefill: q, autoSend: true });
-        });
         return;
       }
 
@@ -805,7 +782,7 @@
       matchedCourses.forEach((c) => {
         html += `
           <div class="card">
-            <span class="badge ${levelBadgeClass(c.level)}">${esc(c.level)} Course</span>
+            <span class="badge">Course</span>
             <h3 class="card-title" style="margin-top:8px;">${esc(c.title)}</h3>
             <p class="card-muted">${esc(c.description)}</p>
             <button class="btn btn-sm btn-primary" style="margin-top:10px;" data-open-course="${c.id}">Open Course</button>
@@ -816,7 +793,7 @@
       matchedLessons.forEach(({ course, lesson }) => {
         html += `
           <div class="card">
-            <span class="badge badge-cyan">${esc(course.level)} · ${esc(course.title)}</span>
+            <span class="badge badge-cyan">Lesson · ${esc(course.title)}</span>
             <h3 class="card-title" style="margin-top:8px;">${esc(lesson.title)}</h3>
             <p class="card-muted">${esc(lesson.explanation.slice(0, 120))}...</p>
             <button class="btn btn-sm btn-primary" style="margin-top:10px;" data-open-course="${course.id}" data-open-lesson="${lesson.id}">Open Lesson</button>
@@ -841,6 +818,16 @@
             <h3 class="card-title" style="margin-top:8px;">${esc(n.title)}</h3>
             <p class="card-muted">${esc(n.content.slice(0, 120))}</p>
             <button class="btn btn-sm btn-secondary" style="margin-top:10px;" data-nav="notes">Open in Notes</button>
+          </div>
+        `;
+      });
+
+      matchedSaved.forEach((s) => {
+        html += `
+          <div class="card">
+            <span class="badge">Saved Content</span>
+            <h3 class="card-title" style="margin-top:8px;">${esc(s.title)}</h3>
+            <button class="btn btn-sm btn-secondary" style="margin-top:10px;" data-nav="saved">Open in Saved</button>
           </div>
         `;
       });
@@ -879,170 +866,63 @@
     runSearch(initialQuery);
   }
 
-  // ---------- 3. GEMINI-STYLE AI ASSISTANT ----------
-  async function callLiveGeminiAPI(question, mode, history) {
-    const apiKey = getGeminiKey();
-    if (!apiKey) return null;
-
-    const systemInstruction = `You are LuminaStudy AI, a warm, structured, Gemini-style personal study tutor. Current mode: "${mode}". Explain clearly with short paragraphs, bullet points, concrete examples, and code blocks when helpful.`;
-    const recentTurns = (history || []).slice(-6).map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.text }]
-    }));
-    recentTurns.push({ role: "user", parts: [{ text: `[Mode: ${mode}] ${question}` }] });
-
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const resp = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemInstruction }] },
-        contents: recentTurns
-      })
-    });
-
-    if (!resp.ok) {
-      const errData = await resp.json().catch(() => ({}));
-      throw new Error((errData.error && errData.error.message) || `HTTP ${resp.status}`);
-    }
-    const json = await resp.json();
-    const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("Empty response from Gemini API.");
-    return text;
-  }
-
+  // ---------- 3. AI ASSISTANT ----------
   function buildLocalStudyReply(question, mode) {
     const qLower = question.toLowerCase();
-    const words = qLower.split(/\W+/).filter((w) => w.length > 3);
-
-    let bestMatch = null;
-    let bestScore = 0;
-
+    // Search matching lessons or dictionary terms
+    let matchedLesson = null;
+    let matchedCourse = null;
     for (const c of window.LUMINA_COURSES) {
       for (const ch of c.chapters) {
         for (const l of ch.lessons) {
-          let score = 0;
-          const hay = `${l.title} ${l.explanation} ${c.title} ${c.level}`.toLowerCase();
-          if (hay.includes(qLower)) score += 10;
-          words.forEach((w) => {
-            if (l.title.toLowerCase().includes(w)) score += 3;
-            else if (hay.includes(w)) score += 1;
-          });
-          if (score > bestScore) {
-            bestScore = score;
-            bestMatch = { course: c, lesson: l };
+          if (qLower.includes(l.title.toLowerCase()) || l.title.toLowerCase().split(" ").some((w) => w.length > 4 && qLower.includes(w))) {
+            matchedLesson = l;
+            matchedCourse = c;
+            break;
           }
         }
+        if (matchedLesson) break;
       }
+      if (matchedLesson) break;
     }
 
     const matchedTerm = window.LUMINA_DICTIONARY.find((d) => qLower.includes(d.term.toLowerCase()));
-    const matchedMarket = window.LUMINA_MARKET_TOPICS.find((t) => qLower.includes(t.title.toLowerCase()) || words.some((w) => t.title.toLowerCase().includes(w)));
 
     if (mode === "Quiz me") {
-      if (bestMatch && bestMatch.lesson.quiz) {
-        const q = bestMatch.lesson.quiz;
-        return `**Practice Quiz — ${bestMatch.lesson.title}** (${bestMatch.course.level} · ${bestMatch.course.title})\n\n**Question:** ${q.question}\n${q.options.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n\n**Answer:** Option ${q.answerIndex + 1} — ${q.explanation}`;
+      if (matchedLesson && matchedLesson.quiz) {
+        return `Practice Question from "${matchedLesson.title}" (${matchedCourse.title}):\n\nQ: ${matchedLesson.quiz.question}\n${matchedLesson.quiz.options.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n\n(Built-in local study helper — open the full lesson for interactive grading!)`;
       }
-      return `**Quick Self-Quiz on "${question}":**\n1. Define "${question}" in one plain sentence.\n2. Give one real-world example.\n3. Explain how a beginner and an advanced practitioner use it differently.`;
+      return `Quick Self-Quiz on "${question}":\n1. Define "${question}" in one plain sentence.\n2. Give one real-world example.\n3. Explain why it matters for beginners.\n\nTip: Use the "Copy Prompt" + ChatGPT/Gemini buttons below for a full interactive AI quiz.`;
     }
 
     if (mode === "Create study plan") {
-      return `**Structured Study Plan for "${question}" (Beginner → Advanced):**\n• **Step 1 — Foundations (20 min):** Learn the core definition and 3 key terms.\n• **Step 2 — Guided Practice (25 min):** Work through 2 real-world or code examples.\n• **Step 3 — Intermediate Application (30 min):** Write a summary in Notes without looking.\n• **Step 4 — Self-Test (15 min):** Take the lesson quiz or create 3 flashcards.`;
+      return `Starter 4-Step Study Plan for "${question}":\n• Day 1 (20 min): Learn the core definition and 3 key terms.\n• Day 2 (25 min): Work through 2 simple real-world examples.\n• Day 3 (20 min): Write a short summary in your own words in Notes.\n• Day 4 (15 min): Test yourself with flashcards or a quick quiz.`;
     }
 
-    if (bestMatch && bestScore >= 2) {
-      const { course, lesson } = bestMatch;
+    if (matchedLesson) {
       if (mode === "Give examples") {
-        return `**Example from ${course.title} (${course.level}) → ${lesson.title}:**\n\n\`\`\`\n${lesson.example}\n\`\`\`\n\n**Key Takeaway:** ${lesson.points[0]}`;
+        return `Example from ${matchedCourse.title} → ${matchedLesson.title}:\n\n${matchedLesson.example}`;
       }
       if (mode === "Summarize") {
-        return `**Summary — ${lesson.title}** (${course.level} · ${course.title}):\n• ${lesson.points.join("\n• ")}`;
+        return `Summary of ${matchedLesson.title}:\n• ${matchedLesson.points.join("\n• ")}`;
       }
-      if (mode === "Go deeper") {
-        return `**Deep Dive — ${lesson.title}** (${course.level} · ${course.title}):\n\n${lesson.explanation}\n\n**Example:**\n\`\`\`\n${lesson.example}\n\`\`\`\n\n**Practice Challenge:**\n${lesson.practice.map((p, i) => `${i + 1}. ${p}`).join("\n")}`;
-      }
-      return `**${lesson.title}** *(${course.level} · ${course.title})*\n\n${lesson.explanation}\n\n**Example:** ${lesson.example}\n\n**Key Points:**\n• ${lesson.points.join("\n• ")}`;
+      return `${matchedLesson.title} (${matchedCourse.title}):\n\n${matchedLesson.explanation}\n\nExample: ${matchedLesson.example}`;
     }
 
     if (matchedTerm) {
-      return `**${matchedTerm.term}** *(${matchedTerm.category})*\n\n${matchedTerm.def}\n\n*Tip: Connect a free Gemini API key (top right of AI Chat) if you want open-ended live AI tutoring on any topic.*`;
+      return `${matchedTerm.term} (${matchedTerm.category}):\n${matchedTerm.def}\n\nNote: This response comes from LuminaStudy AI's built-in offline study library (no external AI API is connected). Use the ChatGPT or Gemini prompt buttons below for deeper live AI tutoring.`;
     }
 
-    if (matchedMarket) {
-      return `**${matchedMarket.title}**\n\n${matchedMarket.summary}\n\n${matchedMarket.details}`;
-    }
-
-    return `**Offline Curriculum Helper (${mode}):**\nI couldn't find an exact lesson match for "${question}" in the offline library.\n\n**How to get full live Gemini answers right here:**\n1. Click **⚡ Connect Gemini API** above and paste a free key from Google AI Studio (\`aistudio.google.com/apikey\`).\n2. Or click **Prepare ChatGPT / Gemini Prompt** below to copy a structured prompt!`;
+    return `Built-in Local Study Helper (${mode}):\nI searched your local LuminaStudy AI curriculum for "${question}". No external AI API is connected in this static build, so for live AI answers:\n1. Click "Prepare ChatGPT Prompt" or "Prepare Gemini Prompt" below.\n2. Copy the structured prompt and open ChatGPT or Gemini directly.`;
   }
 
-  function openGeminiKeyModal(onSaved) {
-    const existing = getGeminiKey();
-    openModal(`
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <span class="badge">⚡ Live Gemini Mode</span>
-        <button class="btn btn-sm btn-secondary" id="gk-close-x">✕</button>
-      </div>
-      <h3 style="margin:0 0 8px;">Connect Your Free Gemini API Key</h3>
-      <p class="card-muted" style="margin-bottom:12px;">
-        Your key is saved <strong>only in your own browser</strong> (<code>localStorage</code>) and never uploaded to GitHub. Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio ↗</a>.
-      </p>
-      <input id="gk-input" class="form-input" type="password" value="${esc(existing)}" placeholder="Paste AIza... Gemini API key">
-      <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
-        <button id="gk-save-btn" class="btn btn-primary btn-sm">Save &amp; Enable Live Gemini</button>
-        ${existing ? `<button id="gk-clear-btn" class="btn btn-danger btn-sm">Disconnect Key</button>` : ""}
-      </div>
-    `);
-    document.getElementById("gk-close-x").addEventListener("click", closeModal);
-    document.getElementById("gk-save-btn").addEventListener("click", () => {
-      setGeminiKey(document.getElementById("gk-input").value);
-      closeModal();
-      showToast(getGeminiKey() ? "Live Gemini AI connected!" : "Switched to Offline Tutor mode.");
-      if (onSaved) onSaved();
-    });
-    const clr = document.getElementById("gk-clear-btn");
-    if (clr) {
-      clr.addEventListener("click", () => {
-        setGeminiKey("");
-        closeModal();
-        showToast("Gemini API key removed.");
-        if (onSaved) onSaved();
-      });
-    }
-  }
-
-  function speakText(text) {
-    if (!("speechSynthesis" in window)) return showToast("Voice playback not supported in this browser.");
-    window.speechSynthesis.cancel();
-    const clean = text.replace(/[*`#]/g, "");
-    const utter = new SpeechSynthesisUtterance(clean);
-    utter.rate = 1.0;
-    window.speechSynthesis.speak(utter);
-    showToast("Reading answer aloud...");
-  }
-
-  function renderAiChat(container, prefill, autoSend = false) {
+  function renderAiChat(container, prefill) {
     const data = loadData();
-    const hasGeminiKey = Boolean(getGeminiKey());
-    const modes = ["Explain simply", "Go deeper", "Summarize", "Give examples", "Quiz me", "Create study plan"];
-    const starters = [
-      { title: "🐍 Intermediate Python", prompt: "Explain Python OOP classes and REST APIs simply" },
-      { title: "🤖 RAG & AI Agents", prompt: "What is RAG in AI and how do AI agents use tools?" },
-      { title: "📊 Business Unit Economics", prompt: "Explain CAC, LTV, and Gross Margin with an example" },
-      { title: "📈 Investing & Index Funds", prompt: "Compare buying 1 stock vs an Index Fund and explain P/E ratio" }
-    ];
+    const modes = ["Explain simply", "Summarize", "Give examples", "Quiz me", "Create study plan"];
 
     container.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <span class="badge ${hasGeminiKey ? "badge-emerald" : "badge-cyan"}">
-            ${hasGeminiKey ? "⚡ Live Gemini Connected" : "🧠 Built-in Curriculum Tutor"}
-          </span>
-          <span class="card-muted">${hasGeminiKey ? "Powered by your personal Gemini API key" : "Works offline across all 13 courses"}</span>
-        </div>
-        <button id="connect-gemini-btn" class="btn btn-sm ${hasGeminiKey ? "btn-secondary" : "btn-primary"}" type="button">
-          ${hasGeminiKey ? "⚙ Manage Gemini Key" : "⚡ Connect Free Gemini API"}
-        </button>
+      <div class="alert alert-info" style="margin-bottom:16px;">
+        <strong>Honest AI Status:</strong> No paid external AI API is connected in this free static app. Use the built-in offline study helper below, or generate a ready-to-copy prompt for <strong>ChatGPT</strong> or <strong>Gemini</strong>.
       </div>
 
       <div class="pill-bar" id="ai-mode-pills">
@@ -1053,53 +933,40 @@
         <div id="chat-messages" class="chat-messages">
           ${data.chatHistory.length ? data.chatHistory.map((m, idx) => `
             <div class="chat-msg ${m.role}">
-              <div>${m.role === "assistant" ? formatChatMessage(m.text) : esc(m.text)}</div>
+              <div>${esc(m.text)}</div>
               ${m.role === "assistant" ? `
-                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">
+                <div style="display:flex; gap:8px; margin-top:8px;">
                   <button class="btn btn-sm btn-secondary chat-copy-btn" data-idx="${idx}">Copy</button>
-                  <button class="btn btn-sm btn-outline chat-save-btn" data-idx="${idx}">Save Note</button>
-                  <button class="btn btn-sm btn-outline chat-speak-btn" data-idx="${idx}">🔊 Listen</button>
-                  <button class="btn btn-sm btn-outline chat-followup-btn" data-idx="${idx}" data-follow="Explain this even more simply">Simpler</button>
-                  <button class="btn btn-sm btn-outline chat-followup-btn" data-idx="${idx}" data-follow="Give me a 2-question quiz on this">Quiz Me</button>
+                  <button class="btn btn-sm btn-outline chat-save-btn" data-idx="${idx}">Save Answer</button>
                 </div>
               ` : ""}
             </div>
           `).join("") : `
-            <div class="chat-welcome">
-              <h2 class="chat-welcome-title">Hello, what would you like to learn?</h2>
-              <p class="card-muted">Ask anything from Beginner to Advanced, use voice input, or pick a starter prompt below.</p>
-              <div class="starter-grid">
-                ${starters.map((s) => `
-                  <button class="starter-chip" data-starter="${esc(s.prompt)}">
-                    <div style="font-weight:700; margin-bottom:3px;">${s.title}</div>
-                    <div class="card-muted" style="font-size:0.8rem;">${esc(s.prompt)}</div>
-                  </button>
-                `).join("")}
-              </div>
+            <div class="card-muted" style="text-align:center; margin:auto;">
+              Ask a study question below or choose a mode above to get started.
             </div>
           `}
         </div>
         <div class="chat-composer">
-          <button id="ai-mic-btn" class="btn btn-secondary btn-sm" type="button" title="Voice Input">🎤</button>
-          <input id="ai-chat-input" class="form-input" type="text" value="${esc(prefill)}" placeholder="Ask LuminaStudy AI anything...">
+          <input id="ai-chat-input" class="form-input" type="text" value="${esc(prefill)}" placeholder="Ask a study question (e.g. What is compound interest? or Python loops)...">
           <button id="ai-send-btn" class="btn btn-primary" type="button">Send</button>
           <button id="ai-clear-btn" class="btn btn-secondary" type="button">Clear</button>
         </div>
       </div>
 
       <div class="card">
-        <h3 class="card-title">External AI Learning Shortcuts (ChatGPT &amp; Gemini Web)</h3>
-        <p class="card-muted" style="margin-bottom:12px;">Generate a structured learning prompt from your question to open in ChatGPT or Gemini.</p>
+        <h3 class="card-title">External AI Learning Shortcuts (ChatGPT &amp; Gemini)</h3>
+        <p class="card-muted" style="margin-bottom:12px;">Select a platform to build a structured learning prompt from your question above.</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
-          <button id="prep-chatgpt-btn" class="btn btn-secondary btn-sm" type="button">Prepare ChatGPT Prompt</button>
-          <button id="prep-gemini-btn" class="btn btn-secondary btn-sm" type="button">Prepare Gemini Prompt</button>
+          <button id="prep-chatgpt-btn" class="btn btn-secondary" type="button">Prepare ChatGPT Prompt</button>
+          <button id="prep-gemini-btn" class="btn btn-secondary" type="button">Prepare Gemini Prompt</button>
         </div>
         <div id="external-prompt-box" class="hidden">
           <textarea id="generated-prompt-area" class="form-textarea" rows="4" readonly></textarea>
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
             <button id="copy-gen-prompt-btn" class="btn btn-primary btn-sm" type="button">Copy Prompt</button>
             <button id="save-gen-prompt-btn" class="btn btn-outline btn-sm" type="button">Save Prompt</button>
-            <a id="open-external-ai-link" href="https://gemini.google.com/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">Open Gemini ↗</a>
+            <a id="open-external-ai-link" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">Open ChatGPT ↗</a>
           </div>
         </div>
       </div>
@@ -1108,10 +975,6 @@
     const msgBox = document.getElementById("chat-messages");
     msgBox.scrollTop = msgBox.scrollHeight;
 
-    document.getElementById("connect-gemini-btn").addEventListener("click", () => {
-      openGeminiKeyModal(() => renderAiChat(container, document.getElementById("ai-chat-input").value));
-    });
-
     container.querySelectorAll("[data-mode]").forEach((btn) => {
       btn.addEventListener("click", () => {
         selectedAiMode = btn.dataset.mode;
@@ -1119,43 +982,19 @@
       });
     });
 
-    container.querySelectorAll("[data-starter]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        document.getElementById("ai-chat-input").value = btn.dataset.starter;
-        sendMessage();
-      });
-    });
-
-    async function sendMessage(overrideText) {
+    function sendMessage() {
       const input = document.getElementById("ai-chat-input");
-      const q = (overrideText || input.value).trim();
+      const q = input.value.trim();
       if (!q) return;
-
       const d = loadData();
-      const prevHistory = [...d.chatHistory];
       d.chatHistory.push({ role: "user", text: q, at: new Date().toISOString() });
+      const reply = buildLocalStudyReply(q, selectedAiMode);
+      d.chatHistory.push({ role: "assistant", text: reply, at: new Date().toISOString() });
       saveData(d);
-
-      const sendBtn = document.getElementById("ai-send-btn");
-      sendBtn.disabled = true;
-      sendBtn.textContent = "Thinking...";
-
-      let reply = "";
-      try {
-        const liveReply = await callLiveGeminiAPI(q, selectedAiMode, prevHistory);
-        reply = liveReply || buildLocalStudyReply(q, selectedAiMode);
-      } catch (err) {
-        showToast("Gemini API error: " + err.message + " (using offline tutor)");
-        reply = buildLocalStudyReply(q, selectedAiMode);
-      }
-
-      const d2 = loadData();
-      d2.chatHistory.push({ role: "assistant", text: reply, at: new Date().toISOString() });
-      saveData(d2);
       renderAiChat(container, "");
     }
 
-    document.getElementById("ai-send-btn").addEventListener("click", () => sendMessage());
+    document.getElementById("ai-send-btn").addEventListener("click", sendMessage);
     document.getElementById("ai-chat-input").addEventListener("keydown", (e) => {
       if (e.key === "Enter") sendMessage();
     });
@@ -1166,38 +1005,11 @@
       renderAiChat(container, "");
     });
 
-    document.getElementById("ai-mic-btn").addEventListener("click", () => {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SR) return showToast("Voice input is not supported in this browser.");
-      const rec = new SR();
-      rec.lang = "en-US";
-      rec.onresult = (ev) => {
-        const transcript = ev.results[0][0].transcript;
-        document.getElementById("ai-chat-input").value = transcript;
-        showToast("Voice captured!");
-      };
-      rec.onerror = () => showToast("Could not capture voice.");
-      rec.start();
-      showToast("Listening... speak your question");
-    });
-
     container.querySelectorAll(".chat-copy-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const item = loadData().chatHistory[Number(btn.dataset.idx)];
+        const d = loadData();
+        const item = d.chatHistory[Number(btn.dataset.idx)];
         if (item) copyText(item.text);
-      });
-    });
-
-    container.querySelectorAll(".chat-speak-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const item = loadData().chatHistory[Number(btn.dataset.idx)];
-        if (item) speakText(item.text);
-      });
-    });
-
-    container.querySelectorAll(".chat-followup-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        sendMessage(btn.dataset.follow);
       });
     });
 
@@ -1208,9 +1020,9 @@
         if (!item) return;
         d.notes.unshift({
           id: "note-" + Date.now(),
-          title: "AI Study Note (" + selectedAiMode + ")",
+          title: "Saved Study Answer (" + selectedAiMode + ")",
           content: item.text,
-          tag: "AI Assistant",
+          tag: "AI Helper",
           updatedAt: new Date().toISOString()
         });
         saveData(d);
@@ -1219,8 +1031,8 @@
     });
 
     function prepareExternalPrompt(platform) {
-      const q = document.getElementById("ai-chat-input").value.trim() || "Explain a topic clearly";
-      const prompt = `Act as a friendly, patient tutor.\nMode: ${selectedAiMode}\nTopic/Question: ${q}\n\nPlease:\n1. Explain in clear, simple English.\n2. Include 1 real-world example.\n3. End with 2 short practice questions.`;
+      const q = document.getElementById("ai-chat-input").value.trim() || "Explain a beginner topic clearly";
+      const prompt = `Act as a friendly, patient tutor for a beginner student.\nMode: ${selectedAiMode}\nTopic/Question: ${q}\n\nPlease:\n1. Explain in simple, clear English.\n2. Include 1 everyday example.\n3. End with 2 short practice questions.`;
       const box = document.getElementById("external-prompt-box");
       const area = document.getElementById("generated-prompt-area");
       const link = document.getElementById("open-external-ai-link");
@@ -1253,102 +1065,61 @@
       saveData(d);
       showToast("Prompt saved to Saved Content!");
     });
-
-    if (autoSend && prefill) {
-      sendMessage(prefill);
-    }
   }
 
-  // ---------- 4. COURSES (BEGINNER -> INTERMEDIATE -> ADVANCED + GUIDANCE) ----------
-  function renderCourses(container, filterCategoryId, filterLevel) {
-    selectedCourseLevel = filterLevel || "all";
+  // ---------- 4. COURSES & 5. CATEGORIES ----------
+  function renderCourses(container, filterCategoryId) {
     const data = loadData();
-    const levels = ["all", "Beginner", "Intermediate", "Advanced"];
-
-    const courses = window.LUMINA_COURSES.filter((c) => {
-      const matchCat = filterCategoryId === "all" || c.categoryId === filterCategoryId;
-      const matchLvl = selectedCourseLevel === "all" || c.level === selectedCourseLevel;
-      return matchCat && matchLvl;
-    });
+    const courses = filterCategoryId === "all"
+      ? window.LUMINA_COURSES
+      : window.LUMINA_COURSES.filter((c) => c.categoryId === filterCategoryId);
 
     container.innerHTML = `
       <div class="section-header" style="margin-top:0;">
         <div>
-          <h2 class="page-title">Guided Courses (Beginner → Advanced)</h2>
-          <p class="card-muted">Follow structured learning paths with clear prerequisites, examples, and quizzes.</p>
+          <h2 class="page-title">Course Library</h2>
+          <p class="card-muted">Full interactive beginner courses with chapters, examples, quizzes, and saved progress.</p>
         </div>
         <button class="btn btn-outline btn-sm" id="view-all-cats-btn">Browse All 6 Categories</button>
       </div>
 
-      <div class="pill-bar" style="margin-bottom:8px;">
-        ${levels.map((lv) => `
-          <button class="pill-btn ${selectedCourseLevel === lv ? "active" : ""}" data-lvl-filter="${lv}">
-            ${lv === "all" ? "All Levels" : lv}
-          </button>
-        `).join("")}
-      </div>
-
       <div class="pill-bar">
-        <button class="pill-btn ${filterCategoryId === "all" ? "active" : ""}" data-cat-filter="all">All Categories</button>
+        <button class="pill-btn ${filterCategoryId === "all" ? "active" : ""}" data-cat-filter="all">All</button>
         ${window.LUMINA_CATEGORIES.map((cat) => `
           <button class="pill-btn ${filterCategoryId === cat.id ? "active" : ""}" data-cat-filter="${cat.id}">${esc(cat.name)}</button>
         `).join("")}
       </div>
 
-      <div class="grid grid-3" style="margin-bottom:24px;">
+      <div class="grid grid-3">
         ${courses.length ? courses.map((c) => {
           const p = getCourseProgress(c, data);
           return `
             <div class="card card-interactive">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span class="badge ${levelBadgeClass(c.level)}">${esc(c.level)}</span>
+                <span class="badge">${esc(c.level)}</span>
                 <span class="card-muted">${esc(c.duration)}</span>
               </div>
               <h3 class="card-title" style="margin-top:10px;">${esc(c.title)}</h3>
               <p class="card-muted">${esc(c.description)}</p>
-              <p class="card-muted" style="font-size:0.78rem; margin-top:6px;"><strong>Prerequisites:</strong> ${esc(c.prerequisites || "None")}</p>
               <div class="progress-track"><div class="progress-fill" style="width:${p.percent}%"></div></div>
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span class="card-muted">${p.completed}/${p.total} lessons</span>
-                <button class="btn btn-sm btn-primary open-course-btn" data-course="${c.id}">Start / Resume</button>
+                <button class="btn btn-sm btn-primary open-course-btn" data-course="${c.id}">Open</button>
               </div>
             </div>
           `;
         }).join("") : `
           <div class="card" style="grid-column:1/-1;">
-            <h3>No courses match this filter</h3>
-            <p class="card-muted">Switch to <strong>All Levels</strong> or open <strong>Course Categories</strong> to explore all subjects.</p>
+            <h3>No full multi-chapter course in this filter yet</h3>
+            <p class="card-muted">Open <strong>Course Categories</strong> to explore all subjects and starter study guides in this category.</p>
           </div>
         `}
-      </div>
-
-      <div class="section-header">
-        <h2>Step-by-Step Learning Roadmaps</h2>
-      </div>
-      <div class="grid grid-2">
-        ${window.LUMINA_LEARNING_PATHS.map((path) => `
-          <div class="card">
-            <h3 class="card-title">${esc(path.title)}</h3>
-            <p class="card-muted">${esc(path.description)}</p>
-            <div class="roadmap-steps">
-              ${path.steps.map((st) => `
-                <button class="roadmap-step-btn open-course-btn" data-course="${st.courseId}">
-                  <span>${esc(st.label)}</span>
-                  <span class="badge ${levelBadgeClass(st.level)}" style="padding:1px 7px; font-size:0.68rem;">${esc(st.level)}</span>
-                </button>
-              `).join("")}
-            </div>
-          </div>
-        `).join("")}
       </div>
     `;
 
     document.getElementById("view-all-cats-btn").addEventListener("click", () => navigateTo("categories"));
-    container.querySelectorAll("[data-lvl-filter]").forEach((btn) => {
-      btn.addEventListener("click", () => renderCourses(container, filterCategoryId, btn.dataset.lvlFilter));
-    });
     container.querySelectorAll("[data-cat-filter]").forEach((btn) => {
-      btn.addEventListener("click", () => renderCourses(container, btn.dataset.catFilter, selectedCourseLevel));
+      btn.addEventListener("click", () => renderCourses(container, btn.dataset.catFilter));
     });
     container.querySelectorAll(".open-course-btn").forEach((btn) => {
       btn.addEventListener("click", () => navigateTo("course-detail", { courseId: btn.dataset.course }));
@@ -1362,31 +1133,31 @@
         <button class="btn btn-sm btn-secondary" id="modal-close-x">✕</button>
       </div>
       <h2 style="margin:0 0 8px;">${esc(subject)}</h2>
-      <p class="card-muted" style="margin-bottom:14px;">Beginner → Advanced Study Guidance</p>
+      <p class="card-muted" style="margin-bottom:14px;">Beginner Learning Path Guide</p>
       <div class="card" style="margin-bottom:14px;">
-        <strong>Recommended Path for ${esc(subject)}:</strong>
+        <strong>How to start learning ${esc(subject)}:</strong>
         <ul style="margin:8px 0 0; padding-left:18px; color:var(--text-secondary); font-size:0.9rem;">
-          <li><strong>Beginner:</strong> Master the 5 core definitions and everyday examples.</li>
-          <li><strong>Intermediate:</strong> Solve real-world case studies or small coding/analysis exercises.</li>
-          <li><strong>Advanced:</strong> Teach the concept back in your own words in Notes and test yourself with AI quizzes.</li>
+          <li>Learn the 5 core definitions and everyday examples first.</li>
+          <li>Write a 3-sentence summary in your Notes tab.</li>
+          <li>Generate a beginner quiz or study plan using the AI Prompt shortcut below.</li>
         </ul>
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <button class="btn btn-primary btn-sm" id="sub-ai-prompt-btn">✨ Study with AI Assistant</button>
+        <button class="btn btn-primary btn-sm" id="sub-ai-prompt-btn">✨ Open in AI Prompt Helper</button>
         <button class="btn btn-outline btn-sm" id="sub-save-note-btn">📝 Create Study Note</button>
       </div>
     `);
     document.getElementById("modal-close-x").addEventListener("click", closeModal);
     document.getElementById("sub-ai-prompt-btn").addEventListener("click", () => {
       closeModal();
-      navigateTo("ai-chat", { prefill: "Create a Beginner to Advanced study guide for " + subject, autoSend: true });
+      navigateTo("ai-chat", { prefill: "Teach me the basics of " + subject });
     });
     document.getElementById("sub-save-note-btn").addEventListener("click", () => {
       const d = loadData();
       d.notes.unshift({
         id: "note-" + Date.now(),
         title: subject + " — Study Notes",
-        content: "Key ideas to learn in " + subject + ":\n1. Beginner basics\n2. Intermediate practice\n3. Advanced mastery",
+        content: "Key ideas to learn in " + subject + ":\n1. Core concepts\n2. Simple examples\n3. Practice questions",
         tag: categoryName,
         updatedAt: new Date().toISOString()
       });
@@ -1402,7 +1173,7 @@
       <div class="section-header" style="margin-top:0;">
         <div>
           <h2 class="page-title">Complete Course Categories</h2>
-          <p class="card-muted">Explore all 6 learning domains. Click any subject to open its guided study path or course.</p>
+          <p class="card-muted">Explore all 6 learning domains. Click any subject to open its study guide or related course.</p>
         </div>
       </div>
 
@@ -1424,6 +1195,7 @@
     container.querySelectorAll(".subject-chip").forEach((btn) => {
       btn.addEventListener("click", () => {
         const sub = btn.dataset.sub;
+        // If a flagship course matches directly, open it; otherwise open subject guide
         const directCourse = window.LUMINA_COURSES.find((c) => c.title.toLowerCase().includes(sub.toLowerCase()));
         if (directCourse) {
           navigateTo("course-detail", { courseId: directCourse.id });
@@ -1455,20 +1227,14 @@
     const isBookmarked = data.bookmarks.lessons.includes(lesson.id);
     const savedCourseNote = data.notes.find((n) => n.courseId === course.id && n.lessonId === lesson.id);
     const quizResult = data.quizResults[lesson.id];
-    const nextCourse = course.nextCourseId ? getCourseById(course.nextCourseId) : null;
 
     container.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:16px;">
         <button class="btn btn-secondary btn-sm" id="back-to-courses-btn">← All Courses</button>
-        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <span class="badge ${levelBadgeClass(course.level)}">${esc(course.level)}</span>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <span class="badge">${esc(course.level)}</span>
           <span class="badge badge-cyan">${prog.completed}/${prog.total} Completed (${prog.percent}%)</span>
         </div>
-      </div>
-
-      <div class="alert alert-info" style="margin-bottom:16px;">
-        <strong>Course Guidance:</strong> ${esc(course.guidance || course.description)}
-        ${course.prerequisites ? `<br><span style="font-size:0.82rem;"><strong>Prerequisites:</strong> ${esc(course.prerequisites)}</span>` : ""}
       </div>
 
       <div class="course-layout">
@@ -1492,14 +1258,6 @@
               </div>
             `).join("")}
           </div>
-          ${nextCourse ? `
-            <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border-subtle);">
-              <div class="card-muted" style="font-size:0.78rem; margin-bottom:6px;">Next Recommended Step:</div>
-              <button id="next-course-btn" class="btn btn-outline btn-sm btn-full">
-                Level Up → ${esc(nextCourse.title)} (${esc(nextCourse.level)})
-              </button>
-            </div>
-          ` : ""}
         </aside>
 
         <section>
@@ -1525,7 +1283,7 @@
             </div>
 
             <div class="alert alert-info" style="margin-top:14px;">
-              <strong>Example:</strong><br><span style="white-space:pre-wrap;">${esc(lesson.example)}</span>
+              <strong>Simple Example:</strong><br>${esc(lesson.example)}
             </div>
 
             <div style="margin-top:14px;">
@@ -1536,7 +1294,7 @@
             </div>
 
             <div style="margin-top:14px;">
-              <h3 class="card-title">Guided Practice</h3>
+              <h3 class="card-title">Practice Questions</h3>
               <ol style="margin:6px 0 0; padding-left:20px; color:var(--text-secondary);">
                 ${lesson.practice.map((pq) => `<li>${esc(pq)}</li>`).join("")}
               </ol>
@@ -1573,11 +1331,6 @@
     `;
 
     document.getElementById("back-to-courses-btn").addEventListener("click", () => navigateTo("courses"));
-    const nextCourseBtn = document.getElementById("next-course-btn");
-    if (nextCourseBtn && nextCourse) {
-      nextCourseBtn.addEventListener("click", () => navigateTo("course-detail", { courseId: nextCourse.id }));
-    }
-
     container.querySelectorAll("[data-lesson]").forEach((btn) => {
       btn.addEventListener("click", () => renderCourseDetail(container, course.id, btn.dataset.lesson));
     });
@@ -1655,7 +1408,7 @@
     });
 
     document.getElementById("ask-ai-lesson-btn").addEventListener("click", () => {
-      navigateTo("ai-chat", { prefill: `Explain ${lesson.title} (${course.title}) simply`, autoSend: true });
+      navigateTo("ai-chat", { prefill: `${lesson.title} (${course.title})` });
     });
 
     document.getElementById("prev-lesson-btn").addEventListener("click", () => {
@@ -1696,9 +1449,9 @@
           const p = getCourseProgress(c, data);
           return `
             <div class="card">
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+              <div style="display:flex; justify-content:space-between;">
                 <strong>${esc(c.title)}</strong>
-                <span class="badge ${levelBadgeClass(c.level)}">${esc(c.level)} · ${p.completed}/${p.total}</span>
+                <span>${p.completed}/${p.total}</span>
               </div>
               <div class="progress-track"><div class="progress-fill" style="width:${p.percent}%"></div></div>
               <button class="btn btn-sm btn-primary open-course-btn" data-course="${c.id}">Continue</button>
@@ -1724,6 +1477,7 @@
 
   // ---------- 7. NOTES & SAVED ----------
   function renderNotes(container) {
+    const data = loadData();
     container.innerHTML = `
       <div class="section-header" style="margin-top:0;">
         <h2 class="page-title">Notes</h2>
@@ -1860,7 +1614,9 @@
     const bookmarkedLessons = [];
     window.LUMINA_COURSES.forEach((c) => {
       getFlatLessons(c).forEach((l) => {
-        if (data.bookmarks.lessons.includes(l.id)) bookmarkedLessons.push({ course: c, lesson: l });
+        if (data.bookmarks.lessons.includes(l.id)) {
+          bookmarkedLessons.push({ course: c, lesson: l });
+        }
       });
     });
 
@@ -1870,7 +1626,7 @@
       <div class="grid grid-2" style="margin-bottom:20px;">
         ${bookmarkedLessons.length ? bookmarkedLessons.map(({ course, lesson }) => `
           <div class="card">
-            <span class="badge ${levelBadgeClass(course.level)}">${esc(course.level)} · ${esc(course.title)}</span>
+            <span class="badge">${esc(course.title)}</span>
             <h3 class="card-title" style="margin-top:8px;">${esc(lesson.title)}</h3>
             <p class="card-muted">${esc(lesson.explanation.slice(0, 110))}...</p>
             <div style="display:flex; gap:8px; margin-top:10px;">
@@ -1923,137 +1679,39 @@
     });
   }
 
-  // ---------- 8. LIVE DAILY GOOGLE NEWS ----------
-  async function loadGoogleNewsFeed(tabId, region, forceRefresh = false) {
-    const cacheKey = `${region}_${tabId}`;
-    if (!forceRefresh && newsCache[cacheKey]) return newsCache[cacheKey];
-
-    const regionFeeds = window.LUMINA_GOOGLE_NEWS_FEEDS[region] || window.LUMINA_GOOGLE_NEWS_FEEDS.IN;
-    const rssUrl = regionFeeds[tabId] || regionFeeds.daily;
-    const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
-
-    const resp = await fetch(apiUrl);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    if (data.status !== "ok" || !Array.isArray(data.items)) {
-      throw new Error("Could not parse Google News feed");
-    }
-    newsCache[cacheKey] = data.items.slice(0, 15);
-    return newsCache[cacheKey];
-  }
-
+  // ---------- 8. NEWS ----------
   function renderNews(container) {
     const tabs = [
-      { id: "daily", label: "Top Daily News" },
+      { id: "daily", label: "World & Daily News" },
       { id: "ai", label: "AI News" },
-      { id: "tech", label: "Technology" },
-      { id: "business", label: "Business" },
-      { id: "science", label: "Science" },
-      { id: "education", label: "Education" }
+      { id: "tech", label: "Technology News" },
+      { id: "science", label: "Science News" },
+      { id: "business", label: "Business News" },
+      { id: "education", label: "Education News" }
     ];
+    const sources = window.LUMINA_NEWS_SOURCES[activeNewsTab] || window.LUMINA_NEWS_SOURCES.daily;
 
     container.innerHTML = `
-      <div class="section-header" style="margin-top:0;">
-        <div>
-          <h2 class="page-title">Daily Google News</h2>
-          <p class="card-muted">Live headlines from Google News RSS—click any story to read or study it with AI.</p>
-        </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-          <select id="news-region-select" class="form-select" style="width:auto; min-height:36px; padding:6px 10px;">
-            <option value="IN" ${newsRegion === "IN" ? "selected" : ""}>🇮🇳 India (en-IN)</option>
-            <option value="US" ${newsRegion === "US" ? "selected" : ""}>🌎 Global / US (en-US)</option>
-          </select>
-          <button id="news-refresh-btn" class="btn btn-secondary btn-sm" type="button">↻ Refresh</button>
-        </div>
+      <h2 class="page-title" style="margin-bottom:10px;">News Hub</h2>
+      <div class="alert alert-warning" style="margin-bottom:16px;">
+        <strong>Live news is not connected yet.</strong> No external news API is configured in this free static build. Below are direct links to reputable news publications so you can read verified current reporting.
       </div>
 
       <div class="pill-bar">
         ${tabs.map((t) => `<button class="pill-btn ${activeNewsTab === t.id ? "active" : ""}" data-news-tab="${t.id}">${t.label}</button>`).join("")}
       </div>
 
-      <div class="card" style="margin-bottom:16px;">
-        <input id="news-filter-input" class="form-input" type="search" placeholder="Filter today's headlines by keyword...">
-      </div>
-
-      <div id="news-feed-area">
-        <div class="card"><p class="card-muted">Loading live Google News headlines...</p></div>
+      <div class="grid grid-3">
+        ${sources.map((s) => `
+          <div class="card card-interactive">
+            <span class="badge badge-cyan">Reputable Source</span>
+            <h3 class="card-title" style="margin-top:8px;">${esc(s.name)}</h3>
+            <p class="card-muted" style="margin-bottom:14px;">${esc(s.desc)}</p>
+            <a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">Visit ${esc(s.name)} ↗</a>
+          </div>
+        `).join("")}
       </div>
     `;
-
-    const feedArea = document.getElementById("news-feed-area");
-    let currentItems = [];
-
-    function drawNewsCards(filterText = "") {
-      const term = filterText.trim().toLowerCase();
-      const filtered = currentItems.filter((item) =>
-        !term || (item.title || "").toLowerCase().includes(term) || (item.author || "").toLowerCase().includes(term)
-      );
-
-      if (!filtered.length) {
-        feedArea.innerHTML = `<div class="card"><p class="card-muted">No headlines match "${esc(filterText)}".</p></div>`;
-        return;
-      }
-
-      feedArea.innerHTML = `<div class="grid grid-3">${filtered.map((item, idx) => {
-        const pub = item.pubDate ? new Date(item.pubDate).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "Today";
-        return `
-          <div class="card card-interactive" style="display:flex; flex-direction:column; justify-content:space-between; gap:10px;">
-            <div>
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
-                <span class="badge badge-cyan">Google News</span>
-                <span class="card-muted" style="font-size:0.75rem;">${esc(pub)}</span>
-              </div>
-              <h3 class="card-title" style="margin-top:8px; font-size:0.98rem;">${esc(item.title)}</h3>
-            </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <a href="${esc(item.link)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">Read Story ↗</a>
-              <button class="btn btn-sm btn-outline news-ask-ai-btn" data-idx="${idx}">✨ Study with AI</button>
-            </div>
-          </div>
-        `;
-      }).join("")}</div>`;
-
-      feedArea.querySelectorAll(".news-ask-ai-btn").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const story = filtered[Number(btn.dataset.idx)];
-          if (story) {
-            navigateTo("ai-chat", {
-              prefill: `Explain the background and key takeaways of this news headline for a student: "${story.title}"`,
-              autoSend: true
-            });
-          }
-        });
-      });
-    }
-
-    function drawFallbackSources(reason) {
-      const sources = window.LUMINA_NEWS_SOURCES[activeNewsTab] || window.LUMINA_NEWS_SOURCES.daily;
-      feedArea.innerHTML = `
-        <div class="alert alert-warning" style="margin-bottom:14px;">
-          <strong>Live Google News feed unavailable right now</strong> (${esc(reason)}). Showing direct links to Google News &amp; reputable publications:
-        </div>
-        <div class="grid grid-3">
-          ${sources.map((s) => `
-            <div class="card card-interactive">
-              <span class="badge badge-cyan">Reputable Source</span>
-              <h3 class="card-title" style="margin-top:8px;">${esc(s.name)}</h3>
-              <p class="card-muted" style="margin-bottom:14px;">${esc(s.desc)}</p>
-              <a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">Visit ${esc(s.name)} ↗</a>
-            </div>
-          `).join("")}
-        </div>
-      `;
-    }
-
-    async function fetchAndRender(force = false) {
-      feedArea.innerHTML = `<div class="card"><p class="card-muted">Loading live Google News headlines...</p></div>`;
-      try {
-        currentItems = await loadGoogleNewsFeed(activeNewsTab, newsRegion, force);
-        drawNewsCards(document.getElementById("news-filter-input").value);
-      } catch (err) {
-        drawFallbackSources(err.message);
-      }
-    }
 
     container.querySelectorAll("[data-news-tab]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -2061,18 +1719,6 @@
         renderNews(container);
       });
     });
-
-    document.getElementById("news-region-select").addEventListener("change", (e) => {
-      newsRegion = e.target.value;
-      fetchAndRender(false);
-    });
-
-    document.getElementById("news-refresh-btn").addEventListener("click", () => fetchAndRender(true));
-    document.getElementById("news-filter-input").addEventListener("input", (e) => {
-      if (currentItems.length) drawNewsCards(e.target.value);
-    });
-
-    fetchAndRender(false);
   }
 
   // ---------- 9. MARKET EDUCATION ----------
@@ -2108,7 +1754,9 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: textColor } } },
+        plugins: {
+          legend: { labels: { color: textColor } }
+        },
         scales: {
           x: { ticks: { color: textColor }, grid: { color: "rgba(148,163,184,0.12)" } },
           y: { ticks: { color: textColor }, grid: { color: "rgba(148,163,184,0.12)" } }
@@ -2147,7 +1795,7 @@
     renderMarketChart();
   }
 
-  // ---------- 10. LEARNING TOOLS ----------
+  // ---------- 10. LEARNING TOOLS (11 Working Local Tools) ----------
   function renderTools(container, toolId) {
     activeToolTab = toolId || "prompt-gen";
     const tools = [
@@ -2179,7 +1827,8 @@
       });
     });
 
-    renderToolStage(document.getElementById("tool-stage"), activeToolTab);
+    const stage = document.getElementById("tool-stage");
+    renderToolStage(stage, activeToolTab);
   }
 
   function renderToolStage(stage, id) {
@@ -2190,27 +1839,27 @@
         <div class="card">
           <h3 class="card-title">AI Prompt Generator</h3>
           <div class="grid grid-2" style="margin:12px 0;">
-            <input id="pg-topic" class="form-input" placeholder="Topic (e.g. Python OOP, RAG, DCF Valuation)">
+            <input id="pg-topic" class="form-input" placeholder="Topic (e.g. Python Loops, Accounting Equation)">
             <select id="pg-goal" class="form-select">
               <option>Explain simply for a beginner</option>
-              <option>Give intermediate real-world examples</option>
+              <option>Give 5 real-world examples</option>
               <option>Create a 5-question MCQ quiz</option>
-              <option>Build a 7-day Beginner to Advanced study plan</option>
+              <option>Build a 7-day study plan</option>
             </select>
           </div>
           <button id="pg-build-btn" class="btn btn-primary btn-sm">Generate Prompt</button>
           <textarea id="pg-out" class="form-textarea" rows="4" style="margin-top:12px;" readonly placeholder="Your generated prompt will appear here..."></textarea>
           <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
             <button id="pg-copy-btn" class="btn btn-secondary btn-sm">Copy Prompt</button>
-            <a href="https://gemini.google.com/" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">Open Gemini ↗</a>
             <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">Open ChatGPT ↗</a>
+            <a href="https://gemini.google.com/" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">Open Gemini ↗</a>
           </div>
         </div>
       `;
       document.getElementById("pg-build-btn").addEventListener("click", () => {
         const topic = document.getElementById("pg-topic").value.trim() || "Business Fundamentals";
         const goal = document.getElementById("pg-goal").value;
-        document.getElementById("pg-out").value = `Act as a supportive tutor.\nTopic: ${topic}\nGoal: ${goal}\nKeep explanations clear, structured, and include an example.`;
+        document.getElementById("pg-out").value = `Act as a supportive tutor.\nTopic: ${topic}\nGoal: ${goal}\nAudience: Beginner student.\nKeep explanations clear, structured, and easy to follow.`;
       });
       document.getElementById("pg-copy-btn").addEventListener("click", () => copyText(document.getElementById("pg-out").value));
       return;
@@ -2263,10 +1912,10 @@
     if (id === "quiz-gen") {
       stage.innerHTML = `
         <div class="card">
-          <h3 class="card-title">Quiz Generator from All Courses (Beginner → Advanced)</h3>
+          <h3 class="card-title">Quiz Generator from Course Topics</h3>
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin:12px 0;">
             <select id="qg-course" class="form-select" style="flex:1; min-width:220px;">
-              ${window.LUMINA_COURSES.map((c) => `<option value="${c.id}">[${esc(c.level)}] ${esc(c.title)}</option>`).join("")}
+              ${window.LUMINA_COURSES.map((c) => `<option value="${c.id}">${esc(c.title)}</option>`).join("")}
             </select>
             <button id="qg-start-btn" class="btn btn-primary btn-sm">Generate Practice Quiz</button>
           </div>
@@ -2362,7 +2011,7 @@
       stage.innerHTML = `
         <div class="card">
           <h3 class="card-title">Educational Word Dictionary</h3>
-          <input id="dict-search" class="form-input" style="margin:10px 0 16px;" type="search" placeholder="Search terms (e.g. RAG, Moat, P/E, Revenue)...">
+          <input id="dict-search" class="form-input" style="margin:10px 0 16px;" type="search" placeholder="Search terms (e.g. Revenue, Algorithm, Volatility)...">
           <div id="dict-list" class="grid grid-2"></div>
         </div>
       `;
@@ -2565,14 +2214,10 @@
 
       <div class="grid grid-2" style="margin-bottom:18px;">
         <div class="card">
-          <h3 class="card-title">Profile, Preferences &amp; Gemini Key</h3>
+          <h3 class="card-title">Profile &amp; Preferences</h3>
           <div class="form-group">
             <label class="form-label">Display Name</label>
             <input id="set-display-name" class="form-input" value="${esc((currentUser && currentUser.displayName) || "")}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Personal Gemini API Key (Optional — stored only in this browser)</label>
-            <input id="set-gemini-key" class="form-input" type="password" value="${esc(getGeminiKey())}" placeholder="AIza... (optional for live Gemini responses)">
           </div>
           <div class="form-group">
             <label class="form-label">Theme</label>
@@ -2625,7 +2270,7 @@
 
           <div style="margin-bottom:14px;">
             <h4 style="margin:0 0 6px; font-size:0.95rem;">Account Recovery &amp; 2FA</h4>
-            <p class="card-muted" style="margin-bottom:8px;">• Password reset uses Firebase's verified email reset link.<br>• Two-factor authentication (2FA) is <strong>not enabled</strong> in this client-side build.</p>
+            <p class="card-muted" style="margin-bottom:8px;">• Password reset uses Firebase's verified email reset link.<br>• Two-factor authentication (2FA) is <strong>not enabled</strong> in this client-side build (requires Firebase Identity Platform multi-factor setup).</p>
             <button id="sec-reset-pw-btn" class="btn btn-outline btn-sm">Send Password Reset Email</button>
           </div>
 
@@ -2636,7 +2281,7 @@
       <div class="card">
         <h3 class="card-title">Saved Data, Export &amp; Privacy</h3>
         <p class="card-muted" style="margin-bottom:12px;">
-          Your notes (${data.notes.length}), completed lessons (${Object.keys(data.progress.completedLessons).length}), and preferences are stored locally in this browser's <code>localStorage</code>.
+          Your notes (${data.notes.length}), completed lessons (${Object.keys(data.progress.completedLessons).length}), and preferences are stored locally in this browser's <code>localStorage</code>. They are not backed up to a cloud database yet.
         </p>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <button id="export-all-btn" class="btn btn-secondary btn-sm">Export All Local Data (.JSON)</button>
@@ -2648,7 +2293,6 @@
 
     document.getElementById("save-settings-btn").addEventListener("click", async () => {
       const newName = document.getElementById("set-display-name").value.trim();
-      setGeminiKey(document.getElementById("set-gemini-key").value);
       const d = loadData();
       d.preferences.theme = document.getElementById("set-theme").value;
       d.preferences.language = document.getElementById("set-lang").value;
@@ -2743,16 +2387,18 @@
       <div class="card" style="margin-bottom:16px;">
         <h3 class="card-title">Privacy Policy &amp; Data Transparency</h3>
         <ul style="margin:8px 0 0; padding-left:20px; color:var(--text-secondary);">
-          <li><strong>Firebase Authentication:</strong> Handles your sign-in identity securely. Passwords are never stored in <code>localStorage</code>.</li>
-          <li><strong>Browser Storage:</strong> Course progress, notes, bookmarks, flashcards, and optional personal Gemini API key are saved locally in your browser's <code>localStorage</code>.</li>
-          <li><strong>Live Google News:</strong> Fetched client-side from public Google News RSS feeds via <code>api.rss2json.com</code>.</li>
+          <li><strong>What Firebase Authentication handles:</strong> Your sign-in identity (email address, display name, and authentication tokens). Passwords are never stored in <code>localStorage</code>.</li>
+          <li><strong>What is stored in your browser:</strong> Course progress, completed lessons, notes, bookmarks, flashcards, study plans, quiz scores, and theme/goal preferences are saved locally in <code>localStorage</code>.</li>
+          <li><strong>What is NOT connected:</strong> Cloud Firestore sync, live external AI APIs, live news feeds, and live stock/crypto price feeds are not connected in this free static version.</li>
           <li><strong>Data sharing:</strong> LuminaStudy AI does not sell or share your personal notes or progress with third parties.</li>
+          <li><strong>Clearing your data:</strong> Visit <strong>Settings → Clear All Local Data</strong> at any time, or export a JSON backup first.</li>
         </ul>
       </div>
 
       <div class="card">
         <h3 class="card-title">About &amp; Troubleshooting</h3>
-        <p class="card-muted">LuminaStudy AI is a static, GitHub Pages-compatible learning platform featuring Beginner → Intermediate → Advanced roadmaps, Gemini-style AI tutoring, and live Google News.</p>
+        <p class="card-muted">LuminaStudy AI is a static, GitHub Pages-compatible learning platform built with HTML, CSS, JavaScript, Chart.js, and Firebase Authentication.</p>
+        <p class="card-muted" style="margin-top:8px;">If Google Sign-In shows an unauthorized domain error after publishing, add your <code>&lt;username&gt;.github.io</code> domain inside <strong>Firebase Console → Authentication → Settings → Authorized domains</strong>.</p>
       </div>
     `;
   }
@@ -2780,7 +2426,9 @@
     document.getElementById("sidebar-logout-btn").addEventListener("click", signOutUser);
 
     document.getElementById("topbar-search-input").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") navigateTo("search", { query: e.target.value.trim() });
+      if (e.key === "Enter") {
+        navigateTo("search", { query: e.target.value.trim() });
+      }
     });
 
     document.getElementById("modal-overlay").addEventListener("click", (e) => {
@@ -2788,4 +2436,3 @@
     });
   });
 })();
-```
