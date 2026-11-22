@@ -1,4 +1,3 @@
-javascript
 // LuminaStudy AI - Expandable Course Library (Beginner -> Intermediate -> Advanced), Guided Paths, Google News Feeds & Glossary
 
 window.LUMINA_CATEGORIES = [
