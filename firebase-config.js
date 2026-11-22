@@ -1,4 +1,5 @@
-window.LUMINA_FIREBASE_CONFIG = {
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
   apiKey: "AIzaSyARZhbi2if1AuSlvMl9lQTXhL_1CrCEh0Q",
   authDomain: "luminastudy-ai.firebaseapp.com",
   projectId: "luminastudy-ai",
